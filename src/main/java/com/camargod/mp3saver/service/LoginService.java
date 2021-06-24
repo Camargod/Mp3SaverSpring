@@ -18,7 +18,9 @@ import javax.servlet.ServletRequest;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -46,15 +48,24 @@ public class LoginService {
 
         final String token = userService.generateJwtToken(validatedUser);
 
-        final Cookie sessionIdCookie = setRedisSession(validatedUser.getName());
+        final Cookie sessionIdCookie = setRedisSession(requestServlet, validatedUser.getName());
         responseServlet.addCookie(sessionIdCookie);
 
         return ResponseEntity.ok(token);
      }
 
-     public Cookie setRedisSession(String username){
-         Session session = sessionRepository.createSession();
+     public Cookie setRedisSession(HttpServletRequest req, String username){
+         Session session = null;
+         Cookie[] reqCookies = req.getCookies();
+         Cookie sessionCookie = (Cookie) Arrays.stream(reqCookies).filter(cookie -> cookie.getName().equals("SESSION")).toArray()[0];
+         if(sessionCookie != null){
+            session = sessionRepository.findById(sessionCookie.getValue());
+         }
+         if(session == null){
+             session = sessionRepository.createSession();
+         }
          session.setAttribute("username",username);
+         session.setAttribute("resources", List.of("Perm1","Perm2","Perm3"));
          Cookie sessionIdCookie = new Cookie("SESSION",session.getId());
          sessionIdCookie.setHttpOnly(true);
          sessionIdCookie.setSecure(false);
@@ -73,5 +84,9 @@ public class LoginService {
              throw new Exception("IHAAAAAA");
          }
 
+     }
+
+     public List<String> getResources(String sessionId){
+        return sessionRepository.findById(sessionId).getAttribute("resources");
      }
 }
